@@ -1,0 +1,6 @@
+.venv/
+videos/
+audio/
+transcripts/
+cookies.txt
+__pycache__/
