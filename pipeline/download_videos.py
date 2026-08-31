@@ -11,6 +11,10 @@ import http.cookiejar
 import sys
 from pathlib import Path
 
+import truststore
+
+truststore.inject_into_ssl()
+
 import requests
 
 from common import VIDEOS_DIR, load_videos
@@ -19,6 +23,12 @@ from common import VIDEOS_DIR, load_videos
 def build_session(cookies_path: Path) -> requests.Session:
     jar = http.cookiejar.MozillaCookieJar(str(cookies_path))
     jar.load(ignore_discard=True, ignore_expires=True)
+    for cookie in jar:
+        # expires=0 in the Netscape file means "session cookie, no expiry",
+        # but Cookie.is_expired() reads it as "expired in 1970" and would
+        # silently drop it from every outgoing request.
+        if cookie.expires == 0:
+            cookie.expires = None
     session = requests.Session()
     session.cookies = jar
     session.headers.update({"User-Agent": "Mozilla/5.0"})
