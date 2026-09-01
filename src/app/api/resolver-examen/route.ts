@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
-import { embedQuery } from "@/lib/openai/embeddings";
+// TODO: volver a la búsqueda semántica (embedQuery + match_knowledge_chunks)
+// una vez que haya créditos cargados en OpenAI. Mientras tanto usamos
+// match_knowledge_chunks_keyword (búsqueda por palabras clave, sin API paga).
+// import { embedQuery } from "@/lib/openai/embeddings";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -87,10 +90,9 @@ async function resolverExamen(request: NextRequest) {
 
   let chunks: KnowledgeChunk[] = [];
   if (queryText) {
-    const embedding = await embedQuery(queryText);
     const supabase = await createClient();
-    const { data, error } = await supabase.rpc("match_knowledge_chunks", {
-      query_embedding: embedding,
+    const { data, error } = await supabase.rpc("match_knowledge_chunks_keyword", {
+      query_text: queryText,
       match_count: 10,
     });
     if (error) {
