@@ -26,6 +26,18 @@ function toImageMediaType(mime: string): ImageMediaType {
 }
 
 export async function POST(request: NextRequest) {
+  try {
+    return await resolverExamen(request);
+  } catch (err) {
+    console.error("Error en /api/resolver-examen:", err);
+    return NextResponse.json(
+      { error: "No se pudo resolver el examen. Intentá de nuevo en unos minutos." },
+      { status: 500 },
+    );
+  }
+}
+
+async function resolverExamen(request: NextRequest) {
   const formData = await request.formData();
   const texto = (formData.get("texto") as string | null)?.trim() ?? "";
   const archivo = formData.get("archivo") as File | null;
