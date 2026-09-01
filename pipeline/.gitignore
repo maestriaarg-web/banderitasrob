@@ -5,4 +5,4 @@ transcripts/
 *cookies*.txt
 __pycache__/
 .env
-chunks_with_embeddings.jsonl
+chunks_with_embeddings*.jsonl
