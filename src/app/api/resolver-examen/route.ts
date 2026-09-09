@@ -28,6 +28,22 @@ function toImageMediaType(mime: string): ImageMediaType {
   return "image/jpeg";
 }
 
+// Si el examen tiene varias preguntas numeradas, buscamos pregunta por
+// pregunta en vez de una sola consulta con todo el texto junto — así cada
+// búsqueda es más específica y no se diluye entre temas distintos.
+function splitIntoQuestions(text: string): string[] {
+  const pattern = /^\s*\d{1,3}[.)]\s+/gm;
+  const matches = [...text.matchAll(pattern)];
+  if (matches.length < 2) return [text];
+  const parts: string[] = [];
+  for (let i = 0; i < matches.length; i++) {
+    const start = matches[i].index!;
+    const end = i + 1 < matches.length ? matches[i + 1].index! : text.length;
+    parts.push(text.slice(start, end).trim());
+  }
+  return parts;
+}
+
 export async function POST(request: NextRequest) {
   try {
     return await resolverExamen(request);
@@ -90,18 +106,31 @@ async function resolverExamen(request: NextRequest) {
 
   let chunks: KnowledgeChunk[] = [];
   if (queryText) {
+    const questions = splitIntoQuestions(queryText);
+    const matchCountPerQuestion = questions.length > 1 ? 6 : 15;
     const supabase = await createClient();
-    const { data, error } = await supabase.rpc("match_knowledge_chunks_keyword", {
-      query_text: queryText,
-      match_count: 10,
-    });
-    if (error) {
-      return NextResponse.json(
-        { error: `Error buscando en la base de conocimiento: ${error.message}` },
-        { status: 500 },
-      );
+    const seen = new Set<number>();
+
+    for (const question of questions) {
+      const { data, error } = await supabase.rpc("match_knowledge_chunks_keyword", {
+        query_text: question,
+        match_count: matchCountPerQuestion,
+      });
+      if (error) {
+        return NextResponse.json(
+          { error: `Error buscando en la base de conocimiento: ${error.message}` },
+          { status: 500 },
+        );
+      }
+      for (const row of (data ?? []) as KnowledgeChunk[]) {
+        if (!seen.has(row.id)) {
+          seen.add(row.id);
+          chunks.push(row);
+        }
+      }
     }
-    chunks = (data ?? []) as KnowledgeChunk[];
+    chunks.sort((a, b) => b.similarity - a.similarity);
+    chunks = chunks.slice(0, 30);
   }
 
   const contexto = chunks
